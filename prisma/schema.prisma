@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum RequestStatus {
+  ISSUED
+  IN_PROGRESS
+  WAITING_CONFIRMATION
+  COMPLETED
+  REJECTED
+}
+
+enum HistoryEventType {
+  CREATED
+  EDITED
+  DEADLINE_CHANGED
+  CONFIRMER_CHANGED
+  ACCEPTED
+  REJECTED
+  REISSUED
+  SENT_FOR_CONFIRMATION
+  RETURNED_TO_WORK
+  COMPLETED
+  COMMENT_ADDED
+  ATTACHMENT_ADDED
+  ATTACHMENT_DELETED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  login        String   @unique
+  passwordHash String
+  fullName     String
+  isExecutor   Boolean  @default(false)
+  isAdmin      Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  createdRequests Request[] @relation("RequestAuthor")
+  confirmedRequests Request[] @relation("RequestConfirmer")
+
+  acceptedRequests             Request[] @relation("RequestAcceptedBy")
+  rejectedRequests             Request[] @relation("RequestRejectedBy")
+  sentForConfirmationRequests  Request[] @relation("RequestSentForConfirmationBy")
+  completedRequests            Request[] @relation("RequestCompletedBy")
+
+  comments            Comment[]
+  uploadedAttachments Attachment[]
+  historyEvents       RequestHistory[] @relation("HistoryActor")
+}
+
+model Request {
+  id          String        @id @default(cuid())
+  number      Int           @unique @default(autoincrement())
+  status      RequestStatus @default(ISSUED)
+  subject     String
+  description String
+
+  authorId    String
+  author      User @relation("RequestAuthor", fields: [authorId], references: [id])
+
+  confirmerId String
+  confirmer   User @relation("RequestConfirmer", fields: [confirmerId], references: [id])
+
+  deadlineAt DateTime
+
+  // Время последнего выставления заявки.
+  // По нему считается правило «не принята более 24 часов».
+  issuedAt DateTime @default(now())
+
+  acceptedById String?
+  acceptedBy   User?     @relation("RequestAcceptedBy", fields: [acceptedById], references: [id])
+  acceptedAt   DateTime?
+
+  rejectedById     String?
+  rejectedBy       User?     @relation("RequestRejectedBy", fields: [rejectedById], references: [id])
+  rejectedAt       DateTime?
+  rejectionReason  String?
+
+  sentForConfirmationById String?
+  sentForConfirmationBy   User?     @relation("RequestSentForConfirmationBy", fields: [sentForConfirmationById], references: [id])
+  sentForConfirmationAt   DateTime?
+
+  completedById String?
+  completedBy   User?     @relation("RequestCompletedBy", fields: [completedById], references: [id])
+  completedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  comments    Comment[]
+  attachments Attachment[]
+  history     RequestHistory[]
+
+  @@index([status])
+  @@index([deadlineAt])
+  @@index([issuedAt])
+  @@index([authorId])
+  @@index([confirmerId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  authorId String
+  author   User @relation(fields: [authorId], references: [id])
+
+  attachments Attachment[]
+
+  @@index([requestId])
+}
+
+model Attachment {
+  id           String   @id @default(cuid())
+  originalName String
+  storedName   String   @unique
+  mimeType     String?
+  sizeBytes    Int
+  createdAt    DateTime @default(now())
+
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  commentId String?
+  comment   Comment? @relation(fields: [commentId], references: [id], onDelete: SetNull)
+
+  uploadedById String
+  uploadedBy   User @relation(fields: [uploadedById], references: [id])
+
+  @@index([requestId])
+  @@index([commentId])
+}
+
+model RequestHistory {
+  id        String           @id @default(cuid())
+  eventType HistoryEventType
+  details   Json?
+  createdAt DateTime         @default(now())
+
+  requestId String
+  request   Request @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  actorId String?
+  actor   User? @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([createdAt])
+}
