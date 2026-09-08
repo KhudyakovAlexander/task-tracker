@@ -104,6 +104,12 @@ export default function Home() {
   const [items, setItems] = useState<RequestItem[]>(requests);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
+const [searchText, setSearchText] = useState("");
+const [selectedStatus, setSelectedStatus] = useState<RequestStatus | "Все">(
+  "Все",
+);
+const [showOnlyOverdue, setShowOnlyOverdue] = useState(false);
+const [showWaitingForAcceptance, setShowWaitingForAcceptance] = useState(false);
   const [subject, setSubject] = useState("");
   const [description, setDescription] = useState("");
   const [confirmer, setConfirmer] = useState("Иванов И.И.");
@@ -340,6 +346,32 @@ const [returnError, setReturnError] = useState("");
 
     setSelectedRequest(updatedRequest);
   }
+    const filteredItems = items.filter((item) => {
+    const normalizedSearch = searchText.trim().toLocaleLowerCase("ru-RU");
+
+    const matchesSearch =
+      !normalizedSearch ||
+      String(item.number).includes(normalizedSearch) ||
+      item.subject.toLocaleLowerCase("ru-RU").includes(normalizedSearch) ||
+      item.description.toLocaleLowerCase("ru-RU").includes(normalizedSearch) ||
+      item.author.toLocaleLowerCase("ru-RU").includes(normalizedSearch) ||
+      item.confirmer.toLocaleLowerCase("ru-RU").includes(normalizedSearch);
+
+    const matchesStatus =
+      selectedStatus === "Все" || item.status === selectedStatus;
+
+    const matchesOverdue = !showOnlyOverdue || Boolean(item.isOverdue);
+
+    const matchesWaitingForAcceptance =
+      !showWaitingForAcceptance || item.status === "Выставлено";
+
+    return (
+      matchesSearch &&
+      matchesStatus &&
+      matchesOverdue &&
+      matchesWaitingForAcceptance
+    );
+  });
   return (
     <main className="min-h-screen bg-slate-100 text-slate-900">
       <header className="border-b border-slate-200 bg-white px-6 py-4 shadow-sm">
@@ -402,7 +434,7 @@ const [returnError, setReturnError] = useState("");
             <div>
               <h2 className="text-2xl font-bold">Все заявки</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Всего заявок: {items.length}
+                Показано: {filteredItems.length} из {items.length}
               </p>
             </div>
 
@@ -415,31 +447,54 @@ const [returnError, setReturnError] = useState("");
 
           <div className="mb-5 rounded-lg bg-white p-4 shadow-sm">
             <input
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-              placeholder="Поиск по номеру, теме или описанию..."
-              type="search"
-            />
+  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+  onChange={(event) => setSearchText(event.target.value)}
+  placeholder="Поиск по номеру, теме, описанию или пользователю..."
+  type="search"
+  value={searchText}
+/>
 
             <div className="mt-3 flex flex-wrap gap-2">
-              <button className="rounded-full bg-slate-800 px-3 py-1.5 text-xs font-medium text-white">
-                Все
-              </button>
-              <button className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium hover:bg-slate-200">
-                Выставлено
-              </button>
-              <button className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium hover:bg-slate-200">
-                В работе
-              </button>
-              <button className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium hover:bg-slate-200">
-                Ожидает подтверждения
-              </button>
-              <button className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium hover:bg-slate-200">
-                Выполнено
-              </button>
-              <button className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-medium hover:bg-slate-200">
-                Отклонено
-              </button>
-            </div>
+  {(["Все", "Выставлено", "В работе", "Ожидает подтверждения", "Выполнено", "Отклонено"] as const).map(
+    (status) => (
+      <button
+        className={`rounded-full px-3 py-1.5 text-xs font-medium ${
+          selectedStatus === status
+            ? "bg-slate-800 text-white"
+            : "bg-slate-100 hover:bg-slate-200"
+        }`}
+        key={status}
+        onClick={() => setSelectedStatus(status)}
+        type="button"
+      >
+        {status}
+      </button>
+    ),
+  )}
+</div>
+<div className="mt-4 flex flex-wrap gap-x-5 gap-y-3 text-sm">
+  <label className="flex cursor-pointer items-center gap-2">
+    <input
+      checked={showOnlyOverdue}
+      className="h-4 w-4 accent-red-600"
+      onChange={(event) => setShowOnlyOverdue(event.target.checked)}
+      type="checkbox"
+    />
+    <span className="font-medium text-red-700">Только просроченные</span>
+  </label>
+
+  <label className="flex cursor-pointer items-center gap-2">
+    <input
+      checked={showWaitingForAcceptance}
+      className="h-4 w-4 accent-amber-600"
+      onChange={(event) => setShowWaitingForAcceptance(event.target.checked)}
+      type="checkbox"
+    />
+    <span className="font-medium text-amber-800">
+      Ожидают принятия
+    </span>
+  </label>
+</div>
           </div>
 
           <div className="overflow-hidden rounded-lg bg-white shadow-sm">
@@ -458,7 +513,17 @@ const [returnError, setReturnError] = useState("");
                 </thead>
 
                 <tbody className="divide-y divide-slate-200">
-                  {items.map((request) => (
+                  {filteredItems.length === 0 && (
+  <tr>
+    <td
+      className="px-4 py-10 text-center text-sm text-slate-500"
+      colSpan={7}
+    >
+      По вашему запросу заявок не найдено.
+    </td>
+  </tr>
+)}
+                  {filteredItems.map((request) => (
                     <tr
   className={`cursor-pointer hover:bg-slate-50 ${
     request.isOverdue ? "bg-red-50/60" : ""
