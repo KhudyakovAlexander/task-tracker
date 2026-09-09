@@ -7,6 +7,20 @@ type RequestStatus =
   | "Выполнено"
   | "Отклонено";
 
+type CommentItem = {
+  id: string;
+  author: string;
+  text: string;
+  createdAt: string;
+};
+
+type HistoryItem = {
+  id: string;
+  actor: string;
+  text: string;
+  createdAt: string;
+};
+
 type RequestItem = {
   number: number;
   subject: string;
@@ -24,8 +38,10 @@ type RequestItem = {
   rejectionReason?: string;
     sentForConfirmationBy?: string;
   sentForConfirmationAt?: string;
-  completedAt?: string;
+    completedAt?: string;
   returnReason?: string;
+  comments: CommentItem[];
+  history: HistoryItem[];
 };
 
 const requests: RequestItem[] = [
@@ -40,6 +56,28 @@ const requests: RequestItem[] = [
     deadline: "18.04.2026 17:00",
     control: "Просрочено на 2 ч. 15 мин.",
     isOverdue: true,
+    comments: [
+  {
+    id: "comment-125-1",
+    author: "Петров П.П.",
+    text: "Пожалуйста, дополнительно подключите второй монитор.",
+    createdAt: "16.04.2026 14:30",
+  },
+],
+history: [
+  {
+    id: "history-125-1",
+    actor: "Иванов И.И.",
+    text: "Создал заявку. Статус: «Выставлено».",
+    createdAt: "16.04.2026 09:40",
+  },
+  {
+    id: "history-125-2",
+    actor: "Сидоров С.С.",
+    text: "Принял заявку в работу.",
+    createdAt: "16.04.2026 10:05",
+  },
+],
   },
   {
     number: 124,
@@ -50,6 +88,8 @@ const requests: RequestItem[] = [
     confirmer: "Сидоров С.С.",
     deadline: "19.04.2026 12:00",
     control: "Ожидает принятия",
+    comments: [],
+history: [],
   },
   {
     number: 123,
@@ -61,6 +101,8 @@ const requests: RequestItem[] = [
     deadline: "17.04.2026 18:00",
     control: "Просрочено на 1 день",
     isOverdue: true,
+    comments: [],
+history: [],
   },
   {
     number: 122,
@@ -71,6 +113,8 @@ const requests: RequestItem[] = [
     confirmer: "Петров П.П.",
     deadline: "16.04.2026 14:00",
     control: "—",
+    comments: [],
+history: [],
   },
   {
   number: 121,
@@ -84,9 +128,21 @@ const requests: RequestItem[] = [
   rejectedBy: "Петров П.П.",
   rejectedAt: "15.04.2026 09:40",
   rejectionReason: "Необходимо уточнить, к какой именно системе требуется доступ.",
+  comments: [],
+history: [],
 },
 ];
 const DEMO_STORAGE_KEY = "task-tracker-demo-requests";
+function createId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function currentDateTime() {
+  return new Date().toLocaleString("ru-RU", {
+    dateStyle: "short",
+    timeStyle: "short",
+  });
+}
 
 function statusClass(status: RequestStatus) {
   const classes: Record<RequestStatus, string> = {
@@ -127,6 +183,10 @@ const [confirmationComment, setConfirmationComment] = useState("");
 const [isReturnOpen, setIsReturnOpen] = useState(false);
 const [returnReason, setReturnReason] = useState("");
 const [returnError, setReturnError] = useState("");
+const [newComment, setNewComment] = useState("");
+const [activeTab, setActiveTab] = useState<"comments" | "history">(
+  "comments",
+);
   useEffect(() => {
     try {
       const savedItems = window.localStorage.getItem(DEMO_STORAGE_KEY);
@@ -135,8 +195,14 @@ const [returnError, setReturnError] = useState("");
         const parsedItems = JSON.parse(savedItems) as RequestItem[];
 
         if (Array.isArray(parsedItems)) {
-          setItems(parsedItems);
-        }
+  const normalizedItems = parsedItems.map((item) => ({
+    ...item,
+    comments: Array.isArray(item.comments) ? item.comments : [],
+    history: Array.isArray(item.history) ? item.history : [],
+  }));
+
+  setItems(normalizedItems);
+}
       }
     } catch {
       // Если временные данные повреждены, остаются стартовые заявки.
@@ -153,6 +219,43 @@ const [returnError, setReturnError] = useState("");
     window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(items));
   }, [items, isDemoDataLoaded]);
 
+  function addComment(event: FormEvent<HTMLFormElement>) {
+   event.preventDefault();
+
+  if (!selectedRequest || !newComment.trim()) {
+    return;
+  }
+
+  const comment: CommentItem = {
+    id: createId(),
+    author: "Иванов И.И.",
+    text: newComment.trim(),
+    createdAt: currentDateTime(),
+  };
+
+  const updatedRequest: RequestItem = {
+    ...selectedRequest,
+    comments: [...selectedRequest.comments, comment],
+    history: [
+      ...selectedRequest.history,
+      {
+        id: createId(),
+        actor: "Иванов И.И.",
+        text: "Добавил комментарий.",
+        createdAt: currentDateTime(),
+      },
+    ],
+  };
+
+  setItems((currentItems) =>
+    currentItems.map((item) =>
+      item.number === updatedRequest.number ? updatedRequest : item,
+    ),
+  );
+
+  setSelectedRequest(updatedRequest);
+  setNewComment("");
+}
   function openCreateForm() {
     setSubject("");
     setDescription("");
@@ -200,6 +303,15 @@ const [returnError, setReturnError] = useState("");
         timeStyle: "short",
       }),
       control: "Ожидает принятия",
+      comments: [],
+history: [
+  {
+    id: createId(),
+    actor: "Иванов И.И.",
+    text: "Создал заявку. Статус: «Выставлено».",
+    createdAt: currentDateTime(),
+  },
+],
     };
 
     setItems((currentItems) => [newRequest, ...currentItems]);
@@ -220,6 +332,15 @@ const [returnError, setReturnError] = useState("");
       status: "В работе",
       acceptedBy: "Иванов И.И.",
       acceptedAt,
+      history: [
+  ...selectedRequest.history,
+  {
+    id: createId(),
+    actor: "Иванов И.И.",
+    text: "Принял заявку в работу.",
+    createdAt: acceptedAt,
+  },
+],
       control: "Срок выполнения контролируется",
       isOverdue: false,
     };
@@ -262,6 +383,15 @@ const [returnError, setReturnError] = useState("");
       rejectedBy: "Иванов И.И.",
       rejectedAt,
       rejectionReason: rejectionReason.trim(),
+      history: [
+  ...selectedRequest.history,
+  {
+    id: createId(),
+    actor: "Иванов И.И.",
+    text: `Отклонил заявку. Причина: ${rejectionReason.trim()}`,
+    createdAt: rejectedAt,
+  },
+],
       control: "—",
       isOverdue: false,
     };
@@ -297,6 +427,15 @@ const [returnError, setReturnError] = useState("");
       status: "Ожидает подтверждения",
       sentForConfirmationBy: "Иванов И.И.",
       sentForConfirmationAt,
+      history: [
+  ...selectedRequest.history,
+  {
+    id: createId(),
+    actor: "Иванов И.И.",
+    text: "Отправил заявку на подтверждение.",
+    createdAt: sentForConfirmationAt,
+  },
+],
       control: "Ожидает подтверждения",
       isOverdue: false,
     };
@@ -333,6 +472,15 @@ const [returnError, setReturnError] = useState("");
       ...selectedRequest,
       status: "В работе",
       returnReason: returnReason.trim(),
+      history: [
+  ...selectedRequest.history,
+  {
+    id: createId(),
+    actor: "Иванов И.И.",
+    text: `Вернул заявку в работу. Комментарий: ${returnReason.trim()}`,
+    createdAt: currentDateTime(),
+  },
+],
       control: "Срок выполнения контролируется",
       isOverdue: false,
     };
@@ -361,6 +509,15 @@ const [returnError, setReturnError] = useState("");
       ...selectedRequest,
       status: "Выполнено",
       completedAt,
+      history: [
+  ...selectedRequest.history,
+  {
+    id: createId(),
+    actor: "Иванов И.И.",
+    text: "Подтвердил выполнение заявки.",
+    createdAt: completedAt,
+  },
+],
       control: "—",
       isOverdue: false,
     };
@@ -752,15 +909,108 @@ const [returnError, setReturnError] = useState("");
               </section>
 
               <section className="border-t border-slate-200 pt-6">
-                <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                  История
-                </h4>
+  <div className="flex gap-4 border-b border-slate-200">
+    <button
+      className={`border-b-2 px-1 pb-3 text-sm font-semibold ${
+        activeTab === "comments"
+          ? "border-blue-600 text-blue-700"
+          : "border-transparent text-slate-500 hover:text-slate-800"
+      }`}
+      onClick={() => setActiveTab("comments")}
+      type="button"
+    >
+      Комментарии ({selectedRequest.comments.length})
+    </button>
 
-                <div className="mt-3 rounded-md bg-slate-50 p-3 text-sm text-slate-600">
-                  Заявка отображается в демонстрационном режиме. История
-                  действий будет добавлена вместе с настоящей базой данных.
-                </div>
-              </section>
+    <button
+      className={`border-b-2 px-1 pb-3 text-sm font-semibold ${
+        activeTab === "history"
+          ? "border-blue-600 text-blue-700"
+          : "border-transparent text-slate-500 hover:text-slate-800"
+      }`}
+      onClick={() => setActiveTab("history")}
+      type="button"
+    >
+      История ({selectedRequest.history.length})
+    </button>
+  </div>
+
+  {activeTab === "comments" ? (
+    <div className="pt-4">
+      <div className="space-y-3">
+        {selectedRequest.comments.length === 0 && (
+          <p className="text-sm text-slate-500">
+            Комментариев пока нет.
+          </p>
+        )}
+
+        {selectedRequest.comments.map((comment) => (
+          <article
+            className="rounded-md bg-slate-50 p-3 text-sm"
+            key={comment.id}
+          >
+            <div className="flex flex-wrap justify-between gap-2">
+              <span className="font-semibold text-slate-800">
+                {comment.author}
+              </span>
+              <time className="text-xs text-slate-500">
+                {comment.createdAt}
+              </time>
+            </div>
+            <p className="mt-2 whitespace-pre-wrap text-slate-700">
+              {comment.text}
+            </p>
+          </article>
+        ))}
+      </div>
+
+      <form className="mt-5" onSubmit={addComment}>
+        <label className="block">
+          <span className="text-sm font-medium">Новый комментарий</span>
+          <textarea
+            className="mt-1 min-h-24 w-full resize-y rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            onChange={(event) => setNewComment(event.target.value)}
+            placeholder="Напишите комментарий..."
+            value={newComment}
+          />
+        </label>
+
+        <div className="mt-3 flex justify-end">
+          <button
+            className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+            disabled={!newComment.trim()}
+            type="submit"
+          >
+            Отправить комментарий
+          </button>
+        </div>
+      </form>
+    </div>
+  ) : (
+    <div className="space-y-3 pt-4">
+      {selectedRequest.history.length === 0 && (
+        <p className="text-sm text-slate-500">
+          История действий пока пуста.
+        </p>
+      )}
+
+      {selectedRequest.history
+        .slice()
+        .reverse()
+        .map((event) => (
+          <article
+            className="border-l-2 border-slate-200 pl-3 text-sm"
+            key={event.id}
+          >
+            <p className="font-medium text-slate-800">{event.text}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {event.createdAt} · {event.actor}
+            </p>
+          </article>
+        ))}
+    </div>
+  )}
+</section>
             </div>
 
                         <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 p-4">
