@@ -21,6 +21,12 @@ type HistoryItem = {
   createdAt: string;
 };
 
+type AttachmentItem = {
+  id: string;
+  name: string;
+  size: number;
+};
+
 type RequestItem = {
   number: number;
   subject: string;
@@ -42,6 +48,7 @@ type RequestItem = {
   returnReason?: string;
   comments: CommentItem[];
   history: HistoryItem[];
+  attachments: AttachmentItem[];
 };
 
 const requests: RequestItem[] = [
@@ -78,6 +85,13 @@ history: [
     createdAt: "16.04.2026 10:05",
   },
 ],
+attachments: [
+  {
+    id: "attachment-125-1",
+    name: "Список_оборудования.xlsx",
+    size: 1468006,
+  },
+],
   },
   {
     number: 124,
@@ -90,6 +104,7 @@ history: [
     control: "Ожидает принятия",
     comments: [],
 history: [],
+attachments: [],
   },
   {
     number: 123,
@@ -103,6 +118,7 @@ history: [],
     isOverdue: true,
     comments: [],
 history: [],
+attachments: [],
   },
   {
     number: 122,
@@ -115,6 +131,7 @@ history: [],
     control: "—",
     comments: [],
 history: [],
+attachments: [],
   },
   {
   number: 121,
@@ -130,6 +147,7 @@ history: [],
   rejectionReason: "Необходимо уточнить, к какой именно системе требуется доступ.",
   comments: [],
 history: [],
+attachments: [],
 },
 ];
 const DEMO_STORAGE_KEY = "task-tracker-demo-requests";
@@ -142,6 +160,15 @@ function currentDateTime() {
     dateStyle: "short",
     timeStyle: "short",
   });
+}
+  const MAX_REQUEST_ATTACHMENTS_BYTES = 100 * 1024 * 1024;
+
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) {
+    return `${Math.max(1, Math.round(size / 1024))} КБ`;
+  }
+
+  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
 }
 
 function statusClass(status: RequestStatus) {
@@ -173,6 +200,8 @@ const [showWaitingForAcceptance, setShowWaitingForAcceptance] = useState(false);
   const [confirmer, setConfirmer] = useState("Иванов И.И.");
   const [deadline, setDeadline] = useState("");
   const [formError, setFormError] = useState("");
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+const [attachmentError, setAttachmentError] = useState("");
   const [isRejectOpen, setIsRejectOpen] = useState(false);
 const [rejectionReason, setRejectionReason] = useState("");
 const [rejectionError, setRejectionError] = useState("");
@@ -199,6 +228,7 @@ const [activeTab, setActiveTab] = useState<"comments" | "history">(
     ...item,
     comments: Array.isArray(item.comments) ? item.comments : [],
     history: Array.isArray(item.history) ? item.history : [],
+    attachments: Array.isArray(item.attachments) ? item.attachments : [],
   }));
 
   setItems(normalizedItems);
@@ -256,13 +286,44 @@ const [activeTab, setActiveTab] = useState<"comments" | "history">(
   setSelectedRequest(updatedRequest);
   setNewComment("");
 }
-  function openCreateForm() {
+function handleFilesSelected(event: React.ChangeEvent<HTMLInputElement>) {
+  const files = Array.from(event.target.files ?? []);
+
+  if (files.length === 0) {
+    return;
+  }
+
+  const nextFiles = [...selectedFiles, ...files];
+  const totalSize = nextFiles.reduce((sum, file) => sum + file.size, 0);
+
+  if (totalSize > MAX_REQUEST_ATTACHMENTS_BYTES) {
+    setAttachmentError(
+      "Суммарный размер вложений не может превышать 100 МБ.",
+    );
+    event.target.value = "";
+    return;
+  }
+
+  setSelectedFiles(nextFiles);
+  setAttachmentError("");
+  event.target.value = "";
+}
+
+function removeSelectedFile(indexToRemove: number) {
+  setSelectedFiles((currentFiles) =>
+    currentFiles.filter((_, index) => index !== indexToRemove),
+  );
+  setAttachmentError("");
+} 
+function openCreateForm() {
     setSubject("");
     setDescription("");
     setConfirmer("Иванов И.И.");
     setDeadline("");
-    setFormError("");
-    setIsCreateOpen(true);
+setFormError("");
+setSelectedFiles([]);
+setAttachmentError("");
+setIsCreateOpen(true);
   }
 
   function closeCreateForm() {
@@ -312,6 +373,11 @@ history: [
     createdAt: currentDateTime(),
   },
 ],
+attachments: selectedFiles.map((file) => ({
+  id: createId(),
+  name: file.name,
+  size: file.size,
+})),
     };
 
     setItems((currentItems) => [newRequest, ...currentItems]);
@@ -902,10 +968,31 @@ history: [
                   Вложения
                 </h4>
 
-                <p className="mt-3 text-sm text-slate-500">
-                  Вложений пока нет. Загрузка файлов до 100 МБ на заявку будет
-                  добавлена после подключения постоянного хранения.
-                </p>
+                {selectedRequest.attachments.length === 0 ? (
+  <p className="mt-3 text-sm text-slate-500">Вложений нет.</p>
+) : (
+  <div className="mt-3 divide-y divide-slate-200 overflow-hidden rounded-md border border-slate-200">
+    {selectedRequest.attachments.map((attachment) => (
+      <div
+        className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
+        key={attachment.id}
+      >
+        <div className="min-w-0">
+          <p className="truncate font-medium text-slate-800">
+            📎 {attachment.name}
+          </p>
+          <p className="text-xs text-slate-500">
+            {formatFileSize(attachment.size)}
+          </p>
+        </div>
+
+        <span className="shrink-0 text-xs text-slate-400">
+          Будет доступно на сервере
+        </span>
+      </div>
+    ))}
+  </div>
+)}
               </section>
 
               <section className="border-t border-slate-200 pt-6">
@@ -1277,10 +1364,58 @@ history: [
                 />
               </label>
 
-              <p className="text-sm text-slate-500">
-                Вложения будут добавлены на следующем шаге. Максимальный
-                суммарный размер вложений для заявки: 100 МБ.
-              </p>
+              <div>
+  <div className="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <p className="text-sm font-medium">Вложения</p>
+      <p className="mt-1 text-xs text-slate-500">
+        Максимальный суммарный размер файлов для заявки: 100 МБ.
+      </p>
+    </div>
+
+    <label className="cursor-pointer rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50">
+      Выбрать файлы
+      <input
+        className="sr-only"
+        multiple
+        onChange={handleFilesSelected}
+        type="file"
+      />
+    </label>
+  </div>
+
+  {selectedFiles.length > 0 && (
+    <div className="mt-3 rounded-md border border-slate-200">
+      {selectedFiles.map((file, index) => (
+        <div
+          className="flex items-center justify-between gap-3 border-b border-slate-200 px-3 py-2 text-sm last:border-b-0"
+          key={`${file.name}-${file.size}-${index}`}
+        >
+          <div className="min-w-0">
+            <p className="truncate font-medium text-slate-800">{file.name}</p>
+            <p className="text-xs text-slate-500">
+              {formatFileSize(file.size)}
+            </p>
+          </div>
+
+          <button
+            className="shrink-0 rounded px-2 py-1 text-sm font-medium text-red-700 hover:bg-red-50"
+            onClick={() => removeSelectedFile(index)}
+            type="button"
+          >
+            Удалить
+          </button>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {attachmentError && (
+    <p className="mt-3 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+      {attachmentError}
+    </p>
+  )}
+</div>
 
               {formError && (
                 <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
