@@ -1,5 +1,5 @@
 "use client";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 type RequestStatus =
   | "Выставлено"
   | "В работе"
@@ -86,6 +86,7 @@ const requests: RequestItem[] = [
   rejectionReason: "Необходимо уточнить, к какой именно системе требуется доступ.",
 },
 ];
+const DEMO_STORAGE_KEY = "task-tracker-demo-requests";
 
 function statusClass(status: RequestStatus) {
   const classes: Record<RequestStatus, string> = {
@@ -102,6 +103,7 @@ function statusClass(status: RequestStatus) {
 
 export default function Home() {
   const [items, setItems] = useState<RequestItem[]>(requests);
+  const [isDemoDataLoaded, setIsDemoDataLoaded] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
 const [selectedRequest, setSelectedRequest] = useState<RequestItem | null>(null);
 const [searchText, setSearchText] = useState("");
@@ -125,6 +127,31 @@ const [confirmationComment, setConfirmationComment] = useState("");
 const [isReturnOpen, setIsReturnOpen] = useState(false);
 const [returnReason, setReturnReason] = useState("");
 const [returnError, setReturnError] = useState("");
+  useEffect(() => {
+    try {
+      const savedItems = window.localStorage.getItem(DEMO_STORAGE_KEY);
+
+      if (savedItems) {
+        const parsedItems = JSON.parse(savedItems) as RequestItem[];
+
+        if (Array.isArray(parsedItems)) {
+          setItems(parsedItems);
+        }
+      }
+    } catch {
+      // Если временные данные повреждены, остаются стартовые заявки.
+    } finally {
+      setIsDemoDataLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!isDemoDataLoaded) {
+      return;
+    }
+
+    window.localStorage.setItem(DEMO_STORAGE_KEY, JSON.stringify(items));
+  }, [items, isDemoDataLoaded]);
 
   function openCreateForm() {
     setSubject("");
