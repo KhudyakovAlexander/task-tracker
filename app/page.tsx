@@ -751,6 +751,25 @@ attachments: selectedFiles.map((file) => ({
     control: overdueInfo.controlText,
   };
 });
+const requestCounts = {
+  all: itemsWithOverdueInfo.length,
+  waitingForAcceptance: itemsWithOverdueInfo.filter(
+    (item) => item.status === "Выставлено",
+  ).length,
+  overdue: itemsWithOverdueInfo.filter((item) => item.isOverdue).length,
+  inProgress: itemsWithOverdueInfo.filter(
+    (item) => item.status === "В работе",
+  ).length,
+  waitingForConfirmation: itemsWithOverdueInfo.filter(
+    (item) => item.status === "Ожидает подтверждения",
+  ).length,
+  completed: itemsWithOverdueInfo.filter(
+    (item) => item.status === "Выполнено",
+  ).length,
+  rejected: itemsWithOverdueInfo.filter(
+    (item) => item.status === "Отклонено",
+  ).length,
+};
     const filteredItems = itemsWithOverdueInfo.filter((item) => {
     const normalizedSearch = searchText.trim().toLocaleLowerCase("ru-RU");
 
@@ -807,7 +826,7 @@ attachments: selectedFiles.map((file) => ({
 
 <nav className="space-y-1 text-sm">
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left font-medium ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" &&
       selectedStatus === "Все" &&
       !showOnlyOverdue &&
@@ -818,11 +837,14 @@ attachments: selectedFiles.map((file) => ({
     onClick={() => openRequestsSection()}
     type="button"
   >
-    Все заявки
+    <span>Все заявки</span>
+<span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+  {requestCounts.all}
+</span>
   </button>
 
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" && showWaitingForAcceptance
         ? "bg-amber-50 font-medium text-amber-900"
         : "hover:bg-slate-100"
@@ -832,11 +854,14 @@ attachments: selectedFiles.map((file) => ({
     }
     type="button"
   >
-    Ожидают принятия
+    <span>Ожидают принятия</span>
+<span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">
+  {requestCounts.waitingForAcceptance}
+</span>
   </button>
 
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" && showOnlyOverdue
         ? "bg-red-50 font-medium text-red-700"
         : "text-red-700 hover:bg-red-50"
@@ -844,11 +869,14 @@ attachments: selectedFiles.map((file) => ({
     onClick={() => openRequestsSection("Все", { onlyOverdue: true })}
     type="button"
   >
-    Просроченные
+    <span>Просроченные</span>
+<span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
+  {requestCounts.overdue}
+</span>
   </button>
 
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" && selectedStatus === "В работе"
         ? "bg-slate-100 font-medium"
         : "hover:bg-slate-100"
@@ -856,11 +884,14 @@ attachments: selectedFiles.map((file) => ({
     onClick={() => openRequestsSection("В работе")}
     type="button"
   >
-    В работе
+    <span>В работе</span>
+<span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+  {requestCounts.inProgress}
+</span>
   </button>
 
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" &&
       selectedStatus === "Ожидает подтверждения"
         ? "bg-slate-100 font-medium"
@@ -869,11 +900,14 @@ attachments: selectedFiles.map((file) => ({
     onClick={() => openRequestsSection("Ожидает подтверждения")}
     type="button"
   >
-    Ожидают подтверждения
+    <span>Ожидают подтверждения</span>
+<span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs text-violet-700">
+  {requestCounts.waitingForConfirmation}
+</span>
   </button>
 
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" && selectedStatus === "Выполнено"
         ? "bg-slate-100 font-medium"
         : "hover:bg-slate-100"
@@ -881,11 +915,14 @@ attachments: selectedFiles.map((file) => ({
     onClick={() => openRequestsSection("Выполнено")}
     type="button"
   >
-    Выполненные
+    <span>Выполненные</span>
+<span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">
+  {requestCounts.completed}
+</span>
   </button>
 
   <button
-    className={`block w-full rounded-md px-3 py-2 text-left ${
+    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left font-medium ${
       activeSection === "requests" && selectedStatus === "Отклонено"
         ? "bg-slate-100 font-medium"
         : "hover:bg-slate-100"
@@ -893,7 +930,10 @@ attachments: selectedFiles.map((file) => ({
     onClick={() => openRequestsSection("Отклонено")}
     type="button"
   >
-    Отклонённые
+    <span>Отклонённые</span>
+<span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs text-slate-700">
+  {requestCounts.rejected}
+</span>
   </button>
 </nav>
 
