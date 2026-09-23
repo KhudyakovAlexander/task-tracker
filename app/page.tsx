@@ -173,6 +173,12 @@ const [isDeadlineEditOpen, setIsDeadlineEditOpen] = useState(false);
 const [newDeadline, setNewDeadline] = useState("");
 const [deadlineComment, setDeadlineComment] = useState("");
 const [deadlineError, setDeadlineError] = useState("");
+const [isReissueOpen, setIsReissueOpen] = useState(false);
+const [reissueSubject, setReissueSubject] = useState("");
+const [reissueDescription, setReissueDescription] = useState("");
+const [reissueConfirmer, setReissueConfirmer] = useState("");
+const [reissueDeadline, setReissueDeadline] = useState("");
+const [reissueError, setReissueError] = useState("");
 const [newComment, setNewComment] = useState("");
 const [activeTab, setActiveTab] = useState<"comments" | "history">(
   "comments",
@@ -276,6 +282,105 @@ function removeSelectedFile(indexToRemove: number) {
   );
   setAttachmentError("");
 } 
+function toDateTimeLocalValue(dateString: string) {
+  const date = new Date(dateString);
+
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0",
+  )}-${String(date.getDate()).padStart(2, "0")}T${String(
+    date.getHours(),
+  ).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+}
+
+function openReissueForm() {
+  if (!selectedRequest) {
+    return;
+  }
+
+  setReissueSubject(selectedRequest.subject);
+  setReissueDescription(selectedRequest.description);
+  setReissueConfirmer(selectedRequest.confirmer);
+  setReissueDeadline(toDateTimeLocalValue(selectedRequest.deadlineAt));
+  setReissueError("");
+  setIsReissueOpen(true);
+}
+
+function reissueRequest(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  if (!selectedRequest) {
+    return;
+  }
+
+  if (
+    !reissueSubject.trim() ||
+    !reissueDescription.trim() ||
+    !reissueConfirmer ||
+    !reissueDeadline
+  ) {
+    setReissueError(
+      "Заполните тему, описание, подтверждающего и срок выполнения.",
+    );
+    return;
+  }
+
+  const deadlineDate = new Date(reissueDeadline);
+
+  if (Number.isNaN(deadlineDate.getTime())) {
+    setReissueError("Укажите корректные дату и время срока.");
+    return;
+  }
+
+  if (deadlineDate.getTime() <= Date.now()) {
+    setReissueError("Срок выполнения должен быть в будущем.");
+    return;
+  }
+
+  const reissuedAt = new Date();
+
+  const updatedRequest: RequestItem = {
+    ...selectedRequest,
+    subject: reissueSubject.trim(),
+    description: reissueDescription.trim(),
+    confirmer: reissueConfirmer,
+    deadline: formatDateTime(deadlineDate),
+    deadlineAt: deadlineDate.toISOString(),
+    issuedAt: reissuedAt.toISOString(),
+
+    status: "Выставлено",
+
+    // Это новый цикл работы с заявкой.
+    acceptedBy: undefined,
+    acceptedAt: undefined,
+    rejectedBy: undefined,
+    rejectedAt: undefined,
+    rejectionReason: undefined,
+    sentForConfirmationBy: undefined,
+    sentForConfirmationAt: undefined,
+    completedAt: undefined,
+    returnReason: undefined,
+
+    history: [
+      ...selectedRequest.history,
+      {
+        id: createId(),
+        actor: "Иванов И.И.",
+        text: "Отредактировал и повторно выставил заявку. Статус: «Выставлено».",
+        createdAt: currentDateTime(),
+      },
+    ],
+  };
+
+  setItems((currentItems) =>
+    currentItems.map((item) =>
+      item.number === updatedRequest.number ? updatedRequest : item,
+    ),
+  );
+
+  setSelectedRequest(updatedRequest);
+  setIsReissueOpen(false);
+}
 function openDeadlineEditForm() {
   if (!selectedRequest) {
     return;
@@ -1164,6 +1269,16 @@ attachments: selectedFiles.map((file) => ({
                   </button>
                 </>
               )}
+              {selectedRequest.status === "Отклонено" &&
+  selectedRequest.author === "Иванов И.И." && (
+    <button
+      className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+      onClick={openReissueForm}
+      type="button"
+    >
+      Редактировать и выставить повторно
+    </button>
+  )}
 
               {selectedRequest.status === "В работе" && (
                 <button
@@ -1399,6 +1514,118 @@ attachments: selectedFiles.map((file) => ({
                 type="submit"
               >
                 Сохранить срок
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+            {isReissueOpen && selectedRequest && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/60 p-4">
+          <form
+            className="mx-auto my-8 w-full max-w-2xl rounded-xl bg-white p-6 shadow-xl"
+            onSubmit={reissueRequest}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold">
+                  Повторно выставить заявку №{selectedRequest.number}
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Исправьте данные заявки и направьте её исполнителям повторно.
+                </p>
+              </div>
+
+              <button
+                aria-label="Закрыть форму"
+                className="rounded-md px-2 py-1 text-xl leading-none text-slate-500 hover:bg-slate-100"
+                onClick={() => setIsReissueOpen(false)}
+                type="button"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="mt-6 space-y-4">
+              <label className="block">
+                <span className="text-sm font-medium">Тема *</span>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(event) => setReissueSubject(event.target.value)}
+                  value={reissueSubject}
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium">Описание *</span>
+                <textarea
+                  className="mt-1 min-h-32 w-full resize-y rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(event) =>
+                    setReissueDescription(event.target.value)
+                  }
+                  value={reissueDescription}
+                />
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium">Подтверждающий *</span>
+                <select
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(event) => setReissueConfirmer(event.target.value)}
+                  value={reissueConfirmer}
+                >
+                  <option value="">Выберите пользователя</option>
+                  <option>Иванов И.И.</option>
+                  <option>Петров П.П.</option>
+                  <option>Сидоров С.С.</option>
+                </select>
+              </label>
+
+              <label className="block">
+                <span className="text-sm font-medium">Срок выполнения *</span>
+                <input
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                  onChange={(event) => setReissueDeadline(event.target.value)}
+                  type="datetime-local"
+                  value={reissueDeadline}
+                />
+              </label>
+
+              {selectedRequest.attachments.length > 0 && (
+                <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600">
+                  <p className="font-medium text-slate-800">
+                    Вложения сохранятся в заявке:
+                  </p>
+                  <ul className="mt-2 list-inside list-disc">
+                    {selectedRequest.attachments.map((attachment) => (
+                      <li key={attachment.id}>
+                        {attachment.name} ({formatFileSize(attachment.size)})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {reissueError && (
+                <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {reissueError}
+                </p>
+              )}
+            </div>
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                onClick={() => setIsReissueOpen(false)}
+                type="button"
+              >
+                Отмена
+              </button>
+
+              <button
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                type="submit"
+              >
+                Выставить повторно
               </button>
             </div>
           </form>
