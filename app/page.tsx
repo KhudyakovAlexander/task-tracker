@@ -183,6 +183,9 @@ const [newComment, setNewComment] = useState("");
 const [activeTab, setActiveTab] = useState<"comments" | "history">(
   "comments",
 );
+const [activeSection, setActiveSection] = useState<"requests" | "users">(
+  "requests",
+);
   useEffect(() => {
     try {
       const savedItems = window.localStorage.getItem(DEMO_STORAGE_KEY);
@@ -726,6 +729,19 @@ attachments: selectedFiles.map((file) => ({
 
     setSelectedRequest(updatedRequest);
   }
+  function openRequestsSection(
+  status: RequestStatus | "Все" = "Все",
+  options?: {
+    onlyOverdue?: boolean;
+    waitingForAcceptance?: boolean;
+  },
+) {
+  setActiveSection("requests");
+  setSelectedStatus(status);
+  setShowOnlyOverdue(options?.onlyOverdue ?? false);
+  setShowWaitingForAcceptance(options?.waitingForAcceptance ?? false);
+  setSelectedRequest(null);
+}
   const itemsWithOverdueInfo = items.map((item) => {
   const overdueInfo = getRequestOverdueInfo(item);
 
@@ -766,10 +782,12 @@ attachments: selectedFiles.map((file) => ({
       <header className="border-b border-slate-200 bg-white px-6 py-4 shadow-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div>
-            <h1 className="text-xl font-bold tracking-tight">Трекер заявок</h1>
-            <p className="text-sm text-slate-500">
-              Внутренняя система работы с заявками
-            </p>
+            <h1 className="text-xl font-bold tracking-tight">
+  Fencer TT Заявки АХЧ и ИС
+</h1>
+<p className="text-sm text-slate-500">
+  Внутренняя система управления заявками
+</p>
           </div>
 
           <div className="flex items-center gap-3 text-sm">
@@ -784,41 +802,182 @@ attachments: selectedFiles.map((file) => ({
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-6 py-6 lg:grid-cols-[220px_1fr]">
         <aside className="h-fit rounded-lg bg-white p-4 shadow-sm">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Заявки
-          </p>
+  Заявки
+</p>
 
-          <nav className="space-y-1 text-sm">
-            <a className="block rounded-md bg-slate-100 px-3 py-2 font-medium" href="#">
-              Все заявки
-            </a>
-            <a className="block rounded-md px-3 py-2 hover:bg-slate-100" href="#">
-              Ожидают принятия
-            </a>
-            <a className="block rounded-md px-3 py-2 text-red-700 hover:bg-red-50" href="#">
-              Просроченные
-            </a>
-            <a className="block rounded-md px-3 py-2 hover:bg-slate-100" href="#">
-              В работе
-            </a>
-            <a className="block rounded-md px-3 py-2 hover:bg-slate-100" href="#">
-              Ожидают подтверждения
-            </a>
-            <a className="block rounded-md px-3 py-2 hover:bg-slate-100" href="#">
-              Выполненные
-            </a>
-            <a className="block rounded-md px-3 py-2 hover:bg-slate-100" href="#">
-              Отклонённые
-            </a>
-          </nav>
+<nav className="space-y-1 text-sm">
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left font-medium ${
+      activeSection === "requests" &&
+      selectedStatus === "Все" &&
+      !showOnlyOverdue &&
+      !showWaitingForAcceptance
+        ? "bg-slate-100"
+        : "hover:bg-slate-100"
+    }`}
+    onClick={() => openRequestsSection()}
+    type="button"
+  >
+    Все заявки
+  </button>
 
-          <div className="my-4 border-t border-slate-200" />
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left ${
+      activeSection === "requests" && showWaitingForAcceptance
+        ? "bg-amber-50 font-medium text-amber-900"
+        : "hover:bg-slate-100"
+    }`}
+    onClick={() =>
+      openRequestsSection("Все", { waitingForAcceptance: true })
+    }
+    type="button"
+  >
+    Ожидают принятия
+  </button>
 
-          <a className="block rounded-md px-3 py-2 text-sm hover:bg-slate-100" href="#">
-            Пользователи
-          </a>
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left ${
+      activeSection === "requests" && showOnlyOverdue
+        ? "bg-red-50 font-medium text-red-700"
+        : "text-red-700 hover:bg-red-50"
+    }`}
+    onClick={() => openRequestsSection("Все", { onlyOverdue: true })}
+    type="button"
+  >
+    Просроченные
+  </button>
+
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left ${
+      activeSection === "requests" && selectedStatus === "В работе"
+        ? "bg-slate-100 font-medium"
+        : "hover:bg-slate-100"
+    }`}
+    onClick={() => openRequestsSection("В работе")}
+    type="button"
+  >
+    В работе
+  </button>
+
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left ${
+      activeSection === "requests" &&
+      selectedStatus === "Ожидает подтверждения"
+        ? "bg-slate-100 font-medium"
+        : "hover:bg-slate-100"
+    }`}
+    onClick={() => openRequestsSection("Ожидает подтверждения")}
+    type="button"
+  >
+    Ожидают подтверждения
+  </button>
+
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left ${
+      activeSection === "requests" && selectedStatus === "Выполнено"
+        ? "bg-slate-100 font-medium"
+        : "hover:bg-slate-100"
+    }`}
+    onClick={() => openRequestsSection("Выполнено")}
+    type="button"
+  >
+    Выполненные
+  </button>
+
+  <button
+    className={`block w-full rounded-md px-3 py-2 text-left ${
+      activeSection === "requests" && selectedStatus === "Отклонено"
+        ? "bg-slate-100 font-medium"
+        : "hover:bg-slate-100"
+    }`}
+    onClick={() => openRequestsSection("Отклонено")}
+    type="button"
+  >
+    Отклонённые
+  </button>
+</nav>
+
+<div className="my-4 border-t border-slate-200" />
+
+<button
+  className={`block w-full rounded-md px-3 py-2 text-left text-sm ${
+    activeSection === "users"
+      ? "bg-slate-100 font-medium"
+      : "hover:bg-slate-100"
+  }`}
+  onClick={() => {
+    setActiveSection("users");
+    setSelectedRequest(null);
+  }}
+  type="button"
+>
+  Пользователи
+</button>
         </aside>
 
         <section className="min-w-0">
+          {activeSection === "users" ? (
+  <div>
+    <div className="mb-5">
+      <h2 className="text-2xl font-bold">Пользователи</h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Список пользователей демонстрационной версии системы.
+      </p>
+    </div>
+
+    <div className="overflow-hidden rounded-lg bg-white shadow-sm">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="px-4 py-3 font-semibold">Пользователь</th>
+              <th className="px-4 py-3 font-semibold">Роль</th>
+              <th className="px-4 py-3 font-semibold">Статус</th>
+            </tr>
+          </thead>
+
+          <tbody className="divide-y divide-slate-200">
+            <tr>
+              <td className="px-4 py-4 font-medium">Иванов И.И.</td>
+              <td className="px-4 py-4">Автор заявок, подтверждающий</td>
+              <td className="px-4 py-4">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Активен
+                </span>
+              </td>
+            </tr>
+
+            <tr>
+              <td className="px-4 py-4 font-medium">Петров П.П.</td>
+              <td className="px-4 py-4">Подтверждающий</td>
+              <td className="px-4 py-4">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Активен
+                </span>
+              </td>
+            </tr>
+
+            <tr>
+              <td className="px-4 py-4 font-medium">Сидоров С.С.</td>
+              <td className="px-4 py-4">Исполнитель</td>
+              <td className="px-4 py-4">
+                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+                  Активен
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <p className="mt-4 rounded-md border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+      Управление пользователями, ролями и паролями будет подключено после
+      перехода на PostgreSQL и добавления авторизации.
+    </p>
+  </div>
+) : (
+  <>
           <div className="mb-5 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-2xl font-bold">Все заявки</h2>
@@ -956,7 +1115,9 @@ attachments: selectedFiles.map((file) => ({
                 </tbody>
               </table>
             </div>
-          </div>
+                    </div>
+  </>
+)}
         </section>
       </div>
                  {selectedRequest && (
