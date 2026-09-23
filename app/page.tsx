@@ -1,55 +1,19 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-type RequestStatus =
-  | "Выставлено"
-  | "В работе"
-  | "Ожидает подтверждения"
-  | "Выполнено"
-  | "Отклонено";
-
-type CommentItem = {
-  id: string;
-  author: string;
-  text: string;
-  createdAt: string;
-};
-
-type HistoryItem = {
-  id: string;
-  actor: string;
-  text: string;
-  createdAt: string;
-};
-
-type AttachmentItem = {
-  id: string;
-  name: string;
-  size: number;
-};
-
-type RequestItem = {
-  number: number;
-  subject: string;
-  description: string;
-  status: RequestStatus;
-  author: string;
-  confirmer: string;
-  deadline: string;
-  control: string;
-  isOverdue?: boolean;
-  acceptedBy?: string;
-  acceptedAt?: string;
-  rejectedBy?: string;
-  rejectedAt?: string;
-  rejectionReason?: string;
-    sentForConfirmationBy?: string;
-  sentForConfirmationAt?: string;
-    completedAt?: string;
-  returnReason?: string;
-  comments: CommentItem[];
-  history: HistoryItem[];
-  attachments: AttachmentItem[];
-};
+import type {
+  AttachmentItem,
+  CommentItem,
+  HistoryItem,
+  RequestItem,
+  RequestStatus,
+} from "../types/request";
+import {
+  createId,
+  currentDateTime,
+  formatDateTime,
+  formatFileSize,
+  getRequestOverdueInfo,
+} from "../lib/request-utils";
 
 const requests: RequestItem[] = [
   {
@@ -61,6 +25,8 @@ const requests: RequestItem[] = [
     author: "Иванов И.И.",
     confirmer: "Петров П.П.",
     deadline: "18.04.2026 17:00",
+    deadlineAt: "2026-04-18T17:00:00",
+issuedAt: "2026-04-16T09:40:00",
     control: "Просрочено на 2 ч. 15 мин.",
     isOverdue: true,
     comments: [
@@ -101,6 +67,8 @@ attachments: [
     author: "Сидоров С.С.",
     confirmer: "Сидоров С.С.",
     deadline: "19.04.2026 12:00",
+    deadlineAt: "2026-04-18T17:00:00",
+issuedAt: "2026-04-16T09:40:00",
     control: "Ожидает принятия",
     comments: [],
 history: [],
@@ -114,6 +82,8 @@ attachments: [],
     author: "Иванов И.И.",
     confirmer: "Иванов И.И.",
     deadline: "17.04.2026 18:00",
+    deadlineAt: "2026-04-18T17:00:00",
+issuedAt: "2026-04-16T09:40:00",
     control: "Просрочено на 1 день",
     isOverdue: true,
     comments: [],
@@ -128,6 +98,8 @@ attachments: [],
     author: "Петров П.П.",
     confirmer: "Петров П.П.",
     deadline: "16.04.2026 14:00",
+    deadlineAt: "2026-04-18T17:00:00",
+issuedAt: "2026-04-16T09:40:00",
     control: "—",
     comments: [],
 history: [],
@@ -141,6 +113,8 @@ attachments: [],
   author: "Сидоров С.С.",
   confirmer: "Иванов И.И.",
   deadline: "15.04.2026 12:00",
+  deadlineAt: "2026-04-18T17:00:00",
+issuedAt: "2026-04-16T09:40:00",
   control: "—",
   rejectedBy: "Петров П.П.",
   rejectedAt: "15.04.2026 09:40",
@@ -151,25 +125,8 @@ attachments: [],
 },
 ];
 const DEMO_STORAGE_KEY = "task-tracker-demo-requests";
-function createId() {
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
 
-function currentDateTime() {
-  return new Date().toLocaleString("ru-RU", {
-    dateStyle: "short",
-    timeStyle: "short",
-  });
-}
-  const MAX_REQUEST_ATTACHMENTS_BYTES = 100 * 1024 * 1024;
-
-function formatFileSize(size: number) {
-  if (size < 1024 * 1024) {
-    return `${Math.max(1, Math.round(size / 1024))} КБ`;
-  }
-
-  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
-}
+const MAX_REQUEST_ATTACHMENTS_BYTES = 100 * 1024 * 1024;
 
 function statusClass(status: RequestStatus) {
   const classes: Record<RequestStatus, string> = {
@@ -212,6 +169,10 @@ const [confirmationComment, setConfirmationComment] = useState("");
 const [isReturnOpen, setIsReturnOpen] = useState(false);
 const [returnReason, setReturnReason] = useState("");
 const [returnError, setReturnError] = useState("");
+const [isDeadlineEditOpen, setIsDeadlineEditOpen] = useState(false);
+const [newDeadline, setNewDeadline] = useState("");
+const [deadlineComment, setDeadlineComment] = useState("");
+const [deadlineError, setDeadlineError] = useState("");
 const [newComment, setNewComment] = useState("");
 const [activeTab, setActiveTab] = useState<"comments" | "history">(
   "comments",
@@ -315,6 +276,81 @@ function removeSelectedFile(indexToRemove: number) {
   );
   setAttachmentError("");
 } 
+function openDeadlineEditForm() {
+  if (!selectedRequest) {
+    return;
+  }
+
+  const deadlineDate = new Date(selectedRequest.deadlineAt);
+
+  // Поле datetime-local ожидает дату в виде: 2026-09-10T17:00
+  const localDateTime = `${deadlineDate.getFullYear()}-${String(
+    deadlineDate.getMonth() + 1,
+  ).padStart(2, "0")}-${String(deadlineDate.getDate()).padStart(
+    2,
+    "0",
+  )}T${String(deadlineDate.getHours()).padStart(2, "0")}:${String(
+    deadlineDate.getMinutes(),
+  ).padStart(2, "0")}`;
+
+  setNewDeadline(localDateTime);
+  setDeadlineComment("");
+  setDeadlineError("");
+  setIsDeadlineEditOpen(true);
+}
+
+function updateDeadline(event: FormEvent<HTMLFormElement>) {
+  event.preventDefault();
+
+  if (!selectedRequest) {
+    return;
+  }
+
+  if (!newDeadline) {
+    setDeadlineError("Укажите новый срок выполнения.");
+    return;
+  }
+
+  const deadlineDate = new Date(newDeadline);
+
+  if (Number.isNaN(deadlineDate.getTime())) {
+    setDeadlineError("Укажите корректные дату и время.");
+    return;
+  }
+
+  if (deadlineDate.getTime() <= Date.now()) {
+    setDeadlineError("Новый срок должен быть в будущем.");
+    return;
+  }
+
+  const oldDeadline = selectedRequest.deadline;
+
+  const updatedRequest: RequestItem = {
+    ...selectedRequest,
+    deadline: formatDateTime(deadlineDate),
+    deadlineAt: deadlineDate.toISOString(),
+    history: [
+      ...selectedRequest.history,
+      {
+        id: createId(),
+        actor: "Иванов И.И.",
+        text: `Изменил срок выполнения: ${oldDeadline} → ${formatDateTime(
+          deadlineDate,
+        )}.${deadlineComment.trim() ? ` Комментарий: ${deadlineComment.trim()}` : ""}`,
+        createdAt: currentDateTime(),
+      },
+    ],
+  };
+
+  setItems((currentItems) =>
+    currentItems.map((item) =>
+      item.number === updatedRequest.number ? updatedRequest : item,
+    ),
+  );
+
+  setSelectedRequest(updatedRequest);
+  setIsDeadlineEditOpen(false);
+}
 function openCreateForm() {
     setSubject("");
     setDescription("");
@@ -339,6 +375,7 @@ setIsCreateOpen(true);
     }
 
     const selectedDeadline = new Date(deadline);
+    const issuedAt = new Date();
 
     if (Number.isNaN(selectedDeadline.getTime())) {
       setFormError("Укажите корректные дату и время срока.");
@@ -359,11 +396,9 @@ setIsCreateOpen(true);
       status: "Выставлено",
       author: "Иванов И.И.",
       confirmer,
-      deadline: selectedDeadline.toLocaleString("ru-RU", {
-        dateStyle: "short",
-        timeStyle: "short",
-      }),
-      control: "Ожидает принятия",
+      deadline: formatDateTime(selectedDeadline),
+deadlineAt: selectedDeadline.toISOString(),
+issuedAt: issuedAt.toISOString(),
       comments: [],
 history: [
   {
@@ -407,8 +442,6 @@ attachments: selectedFiles.map((file) => ({
     createdAt: acceptedAt,
   },
 ],
-      control: "Срок выполнения контролируется",
-      isOverdue: false,
     };
 
     setItems((currentItems) =>
@@ -458,8 +491,6 @@ attachments: selectedFiles.map((file) => ({
     createdAt: rejectedAt,
   },
 ],
-      control: "—",
-      isOverdue: false,
     };
 
     setItems((currentItems) =>
@@ -502,8 +533,6 @@ attachments: selectedFiles.map((file) => ({
     createdAt: sentForConfirmationAt,
   },
 ],
-      control: "Ожидает подтверждения",
-      isOverdue: false,
     };
 
     setItems((currentItems) =>
@@ -547,8 +576,6 @@ attachments: selectedFiles.map((file) => ({
     createdAt: currentDateTime(),
   },
 ],
-      control: "Срок выполнения контролируется",
-      isOverdue: false,
     };
 
     setItems((currentItems) =>
@@ -584,8 +611,6 @@ attachments: selectedFiles.map((file) => ({
     createdAt: completedAt,
   },
 ],
-      control: "—",
-      isOverdue: false,
     };
 
     setItems((currentItems) =>
@@ -596,7 +621,16 @@ attachments: selectedFiles.map((file) => ({
 
     setSelectedRequest(updatedRequest);
   }
-    const filteredItems = items.filter((item) => {
+  const itemsWithOverdueInfo = items.map((item) => {
+  const overdueInfo = getRequestOverdueInfo(item);
+
+  return {
+    ...item,
+    isOverdue: overdueInfo.isOverdue,
+    control: overdueInfo.controlText,
+  };
+});
+    const filteredItems = itemsWithOverdueInfo.filter((item) => {
     const normalizedSearch = searchText.trim().toLocaleLowerCase("ru-RU");
 
     const matchesSearch =
@@ -1101,6 +1135,16 @@ attachments: selectedFiles.map((file) => ({
             </div>
 
                         <div className="flex flex-wrap justify-end gap-3 border-t border-slate-200 p-4">
+                          {(selectedRequest.author === "Иванов И.И." ||
+  selectedRequest.confirmer === "Иванов И.И.") && (
+  <button
+    className="rounded-md border border-blue-300 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50"
+    onClick={openDeadlineEditForm}
+    type="button"
+  >
+    Изменить срок
+  </button>
+)}
               {selectedRequest.status === "Выставлено" && (
                 <>
                   <button
@@ -1293,6 +1337,68 @@ attachments: selectedFiles.map((file) => ({
                 type="submit"
               >
                 Вернуть в работу
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+                  {isDeadlineEditOpen && selectedRequest && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/60 p-4">
+          <form
+            className="w-full max-w-lg rounded-xl bg-white p-6 shadow-xl"
+            onSubmit={updateDeadline}
+          >
+            <h3 className="text-xl font-bold">Изменить срок выполнения</h3>
+
+            <p className="mt-2 text-sm text-slate-500">
+              Текущий срок:{" "}
+              <span className="font-medium text-slate-700">
+                {selectedRequest.deadline}
+              </span>
+            </p>
+
+            <label className="mt-5 block">
+              <span className="text-sm font-medium">Новый срок *</span>
+              <input
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                onChange={(event) => setNewDeadline(event.target.value)}
+                type="datetime-local"
+                value={newDeadline}
+              />
+            </label>
+
+            <label className="mt-4 block">
+              <span className="text-sm font-medium">
+                Комментарий <span className="font-normal text-slate-500">(необязательно)</span>
+              </span>
+              <textarea
+                className="mt-1 min-h-24 w-full resize-y rounded-md border border-slate-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+                onChange={(event) => setDeadlineComment(event.target.value)}
+                placeholder="Например: перенесён срок по согласованию."
+                value={deadlineComment}
+              />
+            </label>
+
+            {deadlineError && (
+              <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+                {deadlineError}
+              </p>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                className="rounded-md border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-50"
+                onClick={() => setIsDeadlineEditOpen(false)}
+                type="button"
+              >
+                Отмена
+              </button>
+
+              <button
+                className="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
+                type="submit"
+              >
+                Сохранить срок
               </button>
             </div>
           </form>
