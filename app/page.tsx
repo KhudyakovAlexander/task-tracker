@@ -729,7 +729,7 @@ attachments: selectedFiles.map((file) => ({
 
     setSelectedRequest(updatedRequest);
   }
-  function openRequestsSection(
+ function openRequestsSection(
   status: RequestStatus | "Все" = "Все",
   options?: {
     onlyOverdue?: boolean;
@@ -742,6 +742,16 @@ attachments: selectedFiles.map((file) => ({
   setShowWaitingForAcceptance(options?.waitingForAcceptance ?? false);
   setSelectedRequest(null);
 }
+
+function resetRequestFilters() {
+  setActiveSection("requests");
+  setSearchText("");
+  setSelectedStatus("Все");
+  setShowOnlyOverdue(false);
+  setShowWaitingForAcceptance(false);
+  setSelectedRequest(null);
+}
+
   const itemsWithOverdueInfo = items.map((item) => {
   const overdueInfo = getRequestOverdueInfo(item);
 
@@ -935,6 +945,13 @@ const requestCounts = {
   {requestCounts.rejected}
 </span>
   </button>
+    <button
+    className="mt-2 flex w-full items-center justify-center rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+    onClick={resetRequestFilters}
+    type="button"
+  >
+    Сбросить фильтры
+  </button>
 </nav>
 
 <div className="my-4 border-t border-slate-200" />
@@ -1096,7 +1113,7 @@ const requestCounts = {
                     <th className="px-4 py-3 font-semibold">Автор</th>
                     <th className="px-4 py-3 font-semibold">Подтверждающий</th>
                     <th className="px-4 py-3 font-semibold">Срок</th>
-                    <th className="px-4 py-3 font-semibold">Контроль срока</th>
+                    <th className="w-48 px-4 py-3 font-semibold">Контроль срока</th>
                   </tr>
                 </thead>
 
@@ -1144,12 +1161,12 @@ const requestCounts = {
                         {request.deadline}
                       </td>
                       <td
-                        className={`whitespace-nowrap px-4 py-4 text-xs font-medium ${
-                          request.isOverdue ? "text-red-700" : "text-slate-500"
-                        }`}
-                      >
-                        {request.control}
-                      </td>
+  className={`max-w-48 whitespace-normal break-words px-4 py-4 text-xs font-medium ${
+    request.isOverdue ? "text-red-700" : "text-slate-500"
+  }`}
+>
+  {request.control}
+</td>
                     </tr>
                   ))}
                 </tbody>
